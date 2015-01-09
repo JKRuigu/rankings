@@ -1,6 +1,7 @@
 import requests
 import bs4
 import sys
+import re
 
 # getting schools from 
 # http://www.education.go.ke/results/Index.aspx
@@ -16,7 +17,7 @@ def get_school_index_numbers():
         payload = {'txtSchool':str(x),
                 'SelectOrd':'TotalMarks+DESC',
                 'Submit':'GO'}
-        cookies={'ASP.NET_SessionId':'3xyhsf55urw2yr45vlwfapeh'}
+        cookies={'ASP.NET_SessionId':'dajp54zyl4birripmf4c0d55'}
         r = requests.post(
                 'http://www.education.go.ke/results/searchschool.aspx',
                 data=payload,
@@ -30,7 +31,7 @@ def get_school_index_numbers():
                 'align':'center'}
                 )
         labels = [el.text for el in tbl.contents[0].find_all('td')]
-        print labels
+        #print labels
         for line in tbl.contents[1:]:
             try:
                 contents = tuple(el.text.replace(u'\xa0',u'') for el in line.find_all('td'))
@@ -41,7 +42,7 @@ def get_school_index_numbers():
                 pass
 
     #print data
-    print "data size: ", len(data)
+    #print "data size: ", len(data)
     return set(data) # remove duplicates
 
 
@@ -51,8 +52,12 @@ def get_school_grades(s_index):
 if __name__=='__main__':
     # get school index numbers
     indexes =get_school_index_numbers()
-    print "index length: ", len(indexes)
-    print indexes
+    #print "index length: ", len(indexes)
+    #print indexes
+    for s_index, s_name in indexes:
+        re.sub('\s+', ' ', s_name)
+        print "%s,%s"%(s_index, s_name,) # name and index
+
 
     sys.exit(1)
 
