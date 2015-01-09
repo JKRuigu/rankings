@@ -21,10 +21,6 @@ function get_steps(index_number){
     //console.log('done is ', done);
     var steps = [
         function() {
-            // load page TODO run this once
-            page.open("http://www.knec-portal.ac.ke/RESULTS/ResultKCPE.aspx");
-        },
-        function() {
             //Enter index number and submit
             page.evaluate(function(index_number) {
                 document.getElementById("ctl00_cphMain_TabContainer1_Marks_txtIndex").value=index_number;
@@ -74,6 +70,8 @@ page.onError = function(){
     phantom.exit();
 }
 
+page.open("http://www.knec-portal.ac.ke/RESULTS/ResultKCPE.aspx");
+
 candidateInterval = setInterval(function(){
     if(!candidateInProgress){
         candidateInProgress = true;
@@ -96,8 +94,8 @@ candidateInterval = setInterval(function(){
             candidate++;
             candidateInProgress = false;
           }
-        }, 50);
+        }, 10);
     }
-}, 1000);
+}, 100);
 
 
