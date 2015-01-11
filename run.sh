@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 # generate school ids
 echo "Generating school index numbers"
 seq -w 1 99999999 > schools.txt
