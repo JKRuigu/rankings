@@ -4,7 +4,7 @@ seq -w 1 99999999 > schools.txt
 
 # split into smaller files for parallelization
 echo "splitting up index numbers"
-spilt -d -l 50 schools.txt split-
+spilt -d -l 150 schools.txt split-
 
 # run in parallel
 # max of 200 concurrent jobs
