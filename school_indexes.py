@@ -13,7 +13,7 @@ import re
 def get_school_index_numbers():
     # exploits the fact that search is very fuzzy and not limited.
     data = []
-    for x in xrange(10):
+    for x in range(10)+list('ABCDEFGHIJKLMNOPQRSTUVWXYZ'):
         payload = {'txtSchool':str(x),
                 'SelectOrd':'TotalMarks+DESC',
                 'Submit':'GO'}

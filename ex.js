@@ -80,15 +80,11 @@ var candidateInProgress = false,
 page.onError = function(){
     //phantom.exit();
     //ignore so we can continue brute-forcing
-    // only stop after 200 bad entries
-    // if two hundred students of a particular school
-    // have their scores cancelled or missed the exam,
-    // we have a more serious problem
-    if (badCount > 200){
+    // only stop after 50 'bad/missing entries'
+    if (badCount > 50){
         phantom.exit();
     }else {
         badCount++;
-
     }
     return;
 }
@@ -119,6 +115,5 @@ candidateInterval = setInterval(function(){
           }
         }, 10);
     }
-}, 100);
-
+}, 45);
 
