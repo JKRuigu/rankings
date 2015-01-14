@@ -52,6 +52,7 @@ function get_steps(index_number){
 
                 //console.log("eng ", eng, "kis ", kis, "mat ", mat, "sci ", sci,"ssr ", ssr ,"marks ", marks);
                 console.log(pageIndexNumber+','+gender+','+name+','+eng+','+ kis+','+ mat+','+ sci+','+ ssr+','+ marks+','+schoolName+','+pageschoolIndexNumber+','+engGrade+','+kisGrade+','+matGrade+','+sciGrade+','+ssrGrade);
+		badCount =0; //reset bad Count
                 return;
             }, index_number);
         }
@@ -74,14 +75,13 @@ if (system.args.length === 1) {
 
 var schoolCode = system.args[1];
 
+console.log('SCHOOL::::',schoolCode);
+
 var candidateInProgress = false,
     candidate=1;
 
 page.onError = function(){
-    //phantom.exit();
-    //ignore so we can continue brute-forcing
-    // only stop after 50 'bad/missing entries'
-    if (badCount > 50){
+    if (badCount > 5){
         phantom.exit();
     }else {
         badCount++;

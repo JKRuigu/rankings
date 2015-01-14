@@ -14,4 +14,4 @@
 #ls split-* | parallel --gnu -j200 'sh get_all_scores.sh {}'
 
 # removed middle men
-seq -w 10000000 99999999  | parallel --gnu -j200 'phantomjs ex.js {} >> results.txt'
+seq -w 10000000 99985821 |sort -R  | parallel --gnu -j150 'phantomjs ex.js {} >> results.txt'
