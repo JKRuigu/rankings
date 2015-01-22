@@ -1,4 +1,4 @@
-var page = new WebPage(), testindex = 0, loadInProgress = false, done=false;
+var page = new WebPage(), testindex = 0, badCount=0, loadInProgress = false, done=false;
 var system = require('system');
 
 
@@ -39,8 +39,20 @@ function get_steps(index_number){
                 var sci=document.getElementById("ctl00_cphMain_TabContainer1_Marks_Gridview1_ctl05_MKS").value;
                 var ssr=document.getElementById("ctl00_cphMain_TabContainer1_Marks_Gridview1_ctl06_MKS").value;
 
+                var pageIndexNumber=document.getElementById("ctl00_cphMain_TabContainer1_Marks_LblIndex").innerHTML;
+                var pageschoolIndexNumber=document.getElementById("ctl00_cphMain_TabContainer1_Marks_LblCode").innerHTML;
+                var schoolName=document.getElementById("ctl00_cphMain_TabContainer1_Marks_txtSchool").value;
+                var gender=document.getElementById("ctl00_cphMain_TabContainer1_Marks_txtGender").value;
+                var engGrade=document.getElementById("ctl00_cphMain_TabContainer1_Marks_Gridview1_ctl02_GRADE").value;
+                var kisGrade=document.getElementById("ctl00_cphMain_TabContainer1_Marks_Gridview1_ctl03_GRADE").value;
+                var matGrade=document.getElementById("ctl00_cphMain_TabContainer1_Marks_Gridview1_ctl04_GRADE").value;
+                var sciGrade=document.getElementById("ctl00_cphMain_TabContainer1_Marks_Gridview1_ctl05_GRADE").value;
+                var ssrGrade=document.getElementById("ctl00_cphMain_TabContainer1_Marks_Gridview1_ctl06_GRADE").value;
+
+
                 //console.log("eng ", eng, "kis ", kis, "mat ", mat, "sci ", sci,"ssr ", ssr ,"marks ", marks);
-                console.log(indexNumber+','+name+','+eng+','+ kis+','+ mat+','+ sci+','+ ssr+','+ marks);
+                console.log(pageIndexNumber+','+gender+','+name+','+eng+','+ kis+','+ mat+','+ sci+','+ ssr+','+ marks+','+schoolName+','+pageschoolIndexNumber+','+engGrade+','+kisGrade+','+matGrade+','+sciGrade+','+ssrGrade);
+		badCount =0; //reset bad Count
                 return;
             }, index_number);
         }
@@ -63,11 +75,18 @@ if (system.args.length === 1) {
 
 var schoolCode = system.args[1];
 
+console.log('SCHOOL::::',schoolCode);
+
 var candidateInProgress = false,
     candidate=1;
 
 page.onError = function(){
-    phantom.exit();
+    if (badCount > 5){
+        phantom.exit();
+    }else {
+        badCount++;
+    }
+    return;
 }
 
 page.open("http://www.knec-portal.ac.ke/RESULTS/ResultKCPE.aspx");
@@ -96,6 +115,5 @@ candidateInterval = setInterval(function(){
           }
         }, 10);
     }
-}, 100);
-
+}, 45);
 

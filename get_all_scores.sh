@@ -1,5 +1,5 @@
-for school in $(cat sorted_schools.txt);
+for school in $(cat $1);
 do
-  echo "$school";
+  echo "$school"; # so we can know it's running
   phantomjs ex.js $school >> results.txt
 done
