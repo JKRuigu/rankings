@@ -117,11 +117,8 @@ func getPreData() (predat string) {
 func main() {
 
 	tasks := getIndexNumbers()
-
 	results := make(chan string)
 	client := http.Client{}
-
-	// spawn four worker goroutines
 	var wg sync.WaitGroup
 	for i := 0; i < MAXROUTINES; i++ {
 		wg.Add(1)
@@ -138,7 +135,10 @@ func main() {
 			}
 			wg.Done()
 		}()
+
 	}
+
+	wg.Wait()
 
 	//get html from results channel and parse/ put them in CSV
 
