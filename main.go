@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
-	"sync"
 
 	"github.com/puerkitobio/goquery"
 )
@@ -17,16 +16,6 @@ const (
 	KNEC_URL    = "http://www.knec-portal.ac.ke/RESULTS/ResultKCPE.aspx"
 	MAXROUTINES = 1000
 )
-
-type Student struct {
-	Swahili int
-	English int
-	Math    int
-	Name    int
-	Gender  int
-	Science int
-	SSR     int
-}
 
 /*given an index number return a candidates results in a html page */
 
@@ -130,41 +119,42 @@ func getPreData() (predat string) {
 
 }
 
-func parsePage(page string) (err error) {
+func parsePage(page string) (stud map[string]string, err error) {
 	doc, err := goquery.NewDocumentFromReader(bytes.NewBufferString(page))
-
+	student := make(map[string]string)
 	if err != nil {
-		return err
+		return student, err
 	}
 	//TODO ORGANISE THESE IN AN ARRAY SO WE CAN TEST FOR PRESENCE BETTER
-	marks, _ := doc.Find("#ctl00_cphMain_TabContainer1_Marks_txtTotal").Attr("value")
-	name, _ := doc.Find("#ctl00_cphMain_TabContainer1_Marks_txtName").Attr("value")
-	eng, _ := doc.Find("#ctl00_cphMain_TabContainer1_Marks_Gridview1_ctl02_MKS").Attr("value")
-	kis, _ := doc.Find("#ctl00_cphMain_TabContainer1_Marks_Gridview1_ctl03_MKS").Attr("value")
-	mat, _ := doc.Find("#ctl00_cphMain_TabContainer1_Marks_Gridview1_ctl04_MKS").Attr("value")
-	sci, _ := doc.Find("#ctl00_cphMain_TabContainer1_Marks_Gridview1_ctl05_MKS").Attr("value")
-	ssr, _ := doc.Find("#ctl00_cphMain_TabContainer1_Marks_Gridview1_ctl06_MKS").Attr("value")
+	fields := map[string]string{"total": "#ctl00_cphMain_TabContainer1_Marks_txtTotal",
+		"name":       "#ctl00_cphMain_TabContainer1_Marks_txtName",
+		"eng":        "#ctl00_cphMain_TabContainer1_Marks_Gridview1_ctl02_MKS",
+		"kis":        "#ctl00_cphMain_TabContainer1_Marks_Gridview1_ctl03_MKS",
+		"mat":        "#ctl00_cphMain_TabContainer1_Marks_Gridview1_ctl04_MKS",
+		"sci":        "#ctl00_cphMain_TabContainer1_Marks_Gridview1_ctl05_MKS",
+		"ssr":        "#ctl00_cphMain_TabContainer1_Marks_Gridview1_ctl06_MKS",
+		"schoolName": "#ctl00_cphMain_TabContainer1_Marks_txtSchool",
+		"gender":     "#ctl00_cphMain_TabContainer1_Marks_txtGender",
+		"engGrade":   "#ctl00_cphMain_TabContainer1_Marks_Gridview1_ctl02_GRADE",
+		"kisGrade":   "#ctl00_cphMain_TabContainer1_Marks_Gridview1_ctl03_GRADE",
+		"matGrade":   "#ctl00_cphMain_TabContainer1_Marks_Gridview1_ctl04_GRADE",
+		"sciGrade":   "#ctl00_cphMain_TabContainer1_Marks_Gridview1_ctl05_GRADE",
+		"ssrGrade":   "#ctl00_cphMain_TabContainer1_Marks_Gridview1_ctl06_GRADE",
+	}
+	for subj, param := range fields {
 
-	pageIndexNumber, _ := doc.Find("#ctl00_cphMain_TabContainer1_Marks_LblIndex").Attr("innerHTML")
-	pageschoolIndexNumber, _ := doc.Find("#ctl00_cphMain_TabContainer1_Marks_LblCode").Attr("innerHTML")
-	schoolName, _ := doc.Find("#ctl00_cphMain_TabContainer1_Marks_txtSchool").Attr("value")
-	gender, _ := doc.Find("#ctl00_cphMain_TabContainer1_Marks_txtGender").Attr("value")
-	engGrade, _ := doc.Find("#ctl00_cphMain_TabContainer1_Marks_Gridview1_ctl02_GRADE").Attr("value")
-	kisGrade, _ := doc.Find("#ctl00_cphMain_TabContainer1_Marks_Gridview1_ctl03_GRADE").Attr("value")
-	matGrade, _ := doc.Find("#ctl00_cphMain_TabContainer1_Marks_Gridview1_ctl04_GRADE").Attr("value")
-	sciGrade, _ := doc.Find("#ctl00_cphMain_TabContainer1_Marks_Gridview1_ctl05_GRADE").Attr("value")
-	ssrGrade, _ := doc.Find("#ctl00_cphMain_TabContainer1_Marks_Gridview1_ctl06_GRADE").Attr("value")
-
-	fmt.Println(doc.Find("#ctl00_cphMain_TabContainer1_Marks_txtIndex").Attr("value"))
-
-	fmt.Println(pageIndexNumber + "," + gender + "," + name + "," + eng + "," + kis + "," + mat + "," + sci + "," + ssr + "," + marks + "," + schoolName + "," + pageschoolIndexNumber + "," + engGrade + "," + kisGrade + "," + matGrade + "," + sciGrade + "," + ssrGrade)
-
-	return nil
+		f, ok := doc.Find(param).Attr("value")
+		if !ok {
+			return student, errors.New("Bad page")
+		}
+		student[subj] = f
+	}
+	return student, nil
 }
 
 func main() {
 
-	tasks := getIndexNumbers()
+	/*tasks := getIndexNumbers()
 	results := make(chan string)
 
 	var wg sync.WaitGroup
@@ -186,16 +176,14 @@ func main() {
 
 	}
 
-	wg.Wait()
+	wg.Wait()*/
 
 	//get html from results channel and parse/ put them in CSV
 
-	/*
-		//FOR TESTING
-			client := &http.Client{}
-			index := "01113118001"
-			res, _ := getCandidateResults(index, client)
-			parsePage(res)
-	*/
+	//FOR TESTING
+	client := &http.Client{}
+	index := "01113118001"
+	res, _ := getCandidateResults(index, client)
+	fmt.Println(parsePage(res))
 
 }
