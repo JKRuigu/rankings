@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
+	"sync"
 
 	"github.com/puerkitobio/goquery"
 )
@@ -18,6 +19,10 @@ const (
 )
 
 /*given an index number return a candidates results in a html page */
+type PageResult struct {
+	Page  string
+	Index string
+}
 
 func getCandidateResults(index string, client *http.Client) (htmlPage string, err error) {
 
@@ -119,13 +124,13 @@ func getPreData() (predat string) {
 
 }
 
-func parsePage(page string) (stud map[string]string, err error) {
-	doc, err := goquery.NewDocumentFromReader(bytes.NewBufferString(page))
+func parsePage(pageRes *PageResult) (stud map[string]string, err error) {
+	doc, err := goquery.NewDocumentFromReader(bytes.NewBufferString(pageRes.Page))
 	student := make(map[string]string)
 	if err != nil {
 		return student, err
 	}
-	//TODO ORGANISE THESE IN AN ARRAY SO WE CAN TEST FOR PRESENCE BETTER
+
 	fields := map[string]string{"total": "#ctl00_cphMain_TabContainer1_Marks_txtTotal",
 		"name":       "#ctl00_cphMain_TabContainer1_Marks_txtName",
 		"eng":        "#ctl00_cphMain_TabContainer1_Marks_Gridview1_ctl02_MKS",
@@ -149,12 +154,13 @@ func parsePage(page string) (stud map[string]string, err error) {
 		}
 		student[subj] = f
 	}
+	student["index"] = pageRes.Index
 	return student, nil
 }
 
 func main() {
 
-	/*tasks := getIndexNumbers()
+	tasks := getIndexNumbers()
 	results := make(chan string)
 
 	var wg sync.WaitGroup
@@ -165,10 +171,11 @@ func main() {
 				res, err := getCandidateResults(index, client)
 				if err != nil {
 
-					//put stuff in error channel
+					fmt.Println("Error with the connection")
 
 				}
-				results <- res
+				p := &PageResult{Page: res, Index: index}
+				results <- p
 
 			}
 			wg.Done()
@@ -176,14 +183,15 @@ func main() {
 
 	}
 
-	wg.Wait()*/
+	wg.Wait()
 
 	//get html from results channel and parse/ put them in CSV
 
-	//FOR TESTING
+	/*/FOR TESTING
 	client := &http.Client{}
 	index := "01113118001"
 	res, _ := getCandidateResults(index, client)
-	fmt.Println(parsePage(res))
+	p := &PageResult{Page: res, Index: index}
+	fmt.Println(parsePage(p))*/
 
 }
