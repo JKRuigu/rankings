@@ -3,17 +3,61 @@ package main
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strconv"
 	"sync"
+
+	"github.com/puerkitobio/goquery"
 )
 
 const (
-	POSTDATA       = "&ctl00%24cphMain%24TabContainer1%24Marks%24ddlYear=2014&ctl00%24cphMain%24TabContainer1%24Marks%24btnFind=Find"
-	KNEC_URL       = "http://www.knec-portal.ac.ke/RESULTS/ResultKCPE.aspx"
-	MAXROUTINES    = 1000
-	COUNTY_NUMBERS = []string{
+	POSTDATA    = "&ctl00%24cphMain%24TabContainer1%24Marks%24ddlYear=2014&ctl00%24cphMain%24TabContainer1%24Marks%24btnFind=Find"
+	KNEC_URL    = "http://www.knec-portal.ac.ke/RESULTS/ResultKCPE.aspx"
+	MAXROUTINES = 1000
+)
+
+type Student struct {
+	Swahili int
+	English int
+	Math    int
+	Name    int
+	Gender  int
+	Science int
+	SSR     int
+}
+
+/*given an index number return a candidates results in a html page */
+
+func getCandidateResults(index string, client *http.Client) (htmlPage string, err error) {
+
+	data := getPreData() + index + POSTDATA
+	bb := bytes.NewBuffer([]byte(data))
+	req, err := http.NewRequest("POST", KNEC_URL, bb)
+	if err != nil {
+		return "", errors.New("Couldn't make post request")
+	}
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	resp, err := client.Do(req)
+
+	if err != nil {
+		return "", errors.New("Making request error")
+	}
+
+	restr, err := ioutil.ReadAll(resp.Body)
+
+	if err != nil {
+		return "", errors.New("Body parse error")
+	}
+	return string(restr), nil
+}
+
+func getIndexNumbers() chan string {
+
+	ch := make(chan string) // for generator
+
+	COUNTY_NUMBERS := []string{
 		"01101", "01113", "01114", "01115", "02105", "02109", "02110", "03106", "03108",
 		"03120", "03121", "04102", "04107", "04111", "04116", "04119", "04122", "05103",
 		"05112", "05117", "06104", "06118", "07201", "07209", "07213", "07214", "07215",
@@ -46,40 +90,12 @@ const (
 		"44717", "44718", "44729", "44736", "44739", "45301", "45304", "45305", "45806",
 		"45815", "45816", "45821", "46802", "46807", "46308", "46809", "46813", "46818",
 		"46819", "46320", "47803", "47810", "47311", "47812", "47814", "47817"}
-)
 
-/*given an index number return a candidates results in a html page */
-
-func getCandidateResults(index str, client *http.Client) (htmlPage string, error Error) {
-
-	data := getPreData() + index + POSTDATA
-	bb := bytes.NewBuffer([]byte(data))
-	req, err := http.NewRequest("POST", url, bb)
-	if err != nil {
-		return errors.New("Couldn't make post request")
-	}
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	resp, err := client.Do(req)
-
-	if err != nil {
-		return errors.New("Making request error")
-	}
-
-	restr, err := ioutil.ReadAll(resp.Body)
-
-	if err != nil {
-		return errors.New("Body parse error")
-	}
-	return restr, err
-}
-
-func getIndexNumbers() chan string {
-
-	ch := make(chan string) // for generator
 	go func() {
 		for _, countyIndex := range COUNTY_NUMBERS {
 			// loop through all possible schools
 			for i := 1; i < 1000; i++ {
+				//format this in a way where we can fast forward to a new school
 				var schoolIndex string = "000" + strconv.Itoa(i)
 				schoolIndex = schoolIndex[(len(schoolIndex) - 3):]
 				// for each school, loop through every possible student
@@ -114,11 +130,43 @@ func getPreData() (predat string) {
 
 }
 
+func parsePage(page string) (err error) {
+	doc, err := goquery.NewDocumentFromReader(bytes.NewBufferString(page))
+
+	if err != nil {
+		return err
+	}
+	//TODO ORGANISE THESE IN AN ARRAY SO WE CAN TEST FOR PRESENCE BETTER
+	marks, _ := doc.Find("#ctl00_cphMain_TabContainer1_Marks_txtTotal").Attr("value")
+	name, _ := doc.Find("#ctl00_cphMain_TabContainer1_Marks_txtName").Attr("value")
+	eng, _ := doc.Find("#ctl00_cphMain_TabContainer1_Marks_Gridview1_ctl02_MKS").Attr("value")
+	kis, _ := doc.Find("#ctl00_cphMain_TabContainer1_Marks_Gridview1_ctl03_MKS").Attr("value")
+	mat, _ := doc.Find("#ctl00_cphMain_TabContainer1_Marks_Gridview1_ctl04_MKS").Attr("value")
+	sci, _ := doc.Find("#ctl00_cphMain_TabContainer1_Marks_Gridview1_ctl05_MKS").Attr("value")
+	ssr, _ := doc.Find("#ctl00_cphMain_TabContainer1_Marks_Gridview1_ctl06_MKS").Attr("value")
+
+	pageIndexNumber, _ := doc.Find("#ctl00_cphMain_TabContainer1_Marks_LblIndex").Attr("innerHTML")
+	pageschoolIndexNumber, _ := doc.Find("#ctl00_cphMain_TabContainer1_Marks_LblCode").Attr("innerHTML")
+	schoolName, _ := doc.Find("#ctl00_cphMain_TabContainer1_Marks_txtSchool").Attr("value")
+	gender, _ := doc.Find("#ctl00_cphMain_TabContainer1_Marks_txtGender").Attr("value")
+	engGrade, _ := doc.Find("#ctl00_cphMain_TabContainer1_Marks_Gridview1_ctl02_GRADE").Attr("value")
+	kisGrade, _ := doc.Find("#ctl00_cphMain_TabContainer1_Marks_Gridview1_ctl03_GRADE").Attr("value")
+	matGrade, _ := doc.Find("#ctl00_cphMain_TabContainer1_Marks_Gridview1_ctl04_GRADE").Attr("value")
+	sciGrade, _ := doc.Find("#ctl00_cphMain_TabContainer1_Marks_Gridview1_ctl05_GRADE").Attr("value")
+	ssrGrade, _ := doc.Find("#ctl00_cphMain_TabContainer1_Marks_Gridview1_ctl06_GRADE").Attr("value")
+
+	fmt.Println(doc.Find("#ctl00_cphMain_TabContainer1_Marks_txtIndex").Attr("value"))
+
+	fmt.Println(pageIndexNumber + "," + gender + "," + name + "," + eng + "," + kis + "," + mat + "," + sci + "," + ssr + "," + marks + "," + schoolName + "," + pageschoolIndexNumber + "," + engGrade + "," + kisGrade + "," + matGrade + "," + sciGrade + "," + ssrGrade)
+
+	return nil
+}
+
 func main() {
 
 	tasks := getIndexNumbers()
 	results := make(chan string)
-	client := http.Client{}
+
 	var wg sync.WaitGroup
 	for i := 0; i < MAXROUTINES; i++ {
 		wg.Add(1)
@@ -141,5 +189,13 @@ func main() {
 	wg.Wait()
 
 	//get html from results channel and parse/ put them in CSV
+
+	/*
+		//FOR TESTING
+			client := &http.Client{}
+			index := "01113118001"
+			res, _ := getCandidateResults(index, client)
+			parsePage(res)
+	*/
 
 }
