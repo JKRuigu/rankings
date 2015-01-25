@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"net/http"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/puerkitobio/goquery"
 )
@@ -18,9 +20,10 @@ const (
 	POSTDATA     = "&ctl00%24cphMain%24TabContainer1%24Marks%24ddlYear=2014&ctl00%24cphMain%24TabContainer1%24Marks%24btnFind=Find"
 	KNEC_URL     = "http://www.knec-portal.ac.ke/RESULTS/ResultKCPE.aspx"
 	STUDENTERROR = 5
-	DEBUG        = true
+	DEBUG        = false
 	//schools per county
-	MAXSCHOOLS = 1000
+	MAXSCHOOLS     = 1000
+	MAXCONNECTIONS = 100
 )
 
 /*given an index number return a candidates results in a html page */
@@ -108,19 +111,23 @@ func getCountyNumbers() chan string {
 
 }
 
-func getStudentDetails(countyIndex string, client *http.Client) (students chan map[string]string) {
+func getStudentDetails(countyIndex string, client2 *http.Client) (students chan map[string]string) {
 
 	ch := make(chan map[string]string)
 
 	go func() {
+		client := &http.Client{}
 
 		// loop through all possible schools
 		var wg sync.WaitGroup
 		for i := 0; i < MAXSCHOOLS; i++ {
 			wg.Add(1)
+			//artifical delay for connections
+			time.Sleep(time.Duration(rand.Int31n(3)) * time.Second)
 			go func(i int) {
 				defer wg.Done()
 				var errCount uint64 = 0
+				var conns uint64 = 0
 				debug("New School")
 				var schoolIndex string = "000" + strconv.Itoa(i)
 				schoolIndex = schoolIndex[(len(schoolIndex) - 3):]
@@ -129,7 +136,10 @@ func getStudentDetails(countyIndex string, client *http.Client) (students chan m
 				for j := 0; j < len(candidates); j++ {
 
 					for n := 0; n < len(candidates[j]); n++ {
-
+						conns += 1
+						if conns%MAXCONNECTIONS == 0 {
+							time.Sleep(time.Duration(rand.Int31n(10)) * time.Second)
+						}
 						candidateIndex := "000" + strconv.Itoa(candidates[j][n])
 						candidateIndex = candidateIndex[(len(candidateIndex) - 3):]
 						debug("waiting")
@@ -139,7 +149,7 @@ func getStudentDetails(countyIndex string, client *http.Client) (students chan m
 						if err != nil {
 							log.Fatal(err)
 						}
-
+						debug("got results")
 						p := &PageResult{Page: res, Index: stud}
 						student, err := parsePage(p)
 						if err != nil {
@@ -175,10 +185,10 @@ func genCandidateIndex() map[int][]int {
 		candidates[1] = append(candidates[1], i+1)
 	}
 	for i := 700; i < 800; i++ {
-		candidates[2] = append(candidates[1], i+1)
+		candidates[2] = append(candidates[2], i+1)
 	}
 	for i := 800; i < 900; i++ {
-		candidates[3] = append(candidates[1], i+1)
+		candidates[3] = append(candidates[3], i+1)
 	}
 	return candidates
 }
@@ -247,15 +257,11 @@ func main() {
 		"matGrade", "sciGrade", "ssrGrade"}
 
 	fmt.Println("total,name,eng,kis,mat,sci,ssr,schoolName,gender,engGrade,kisGrade,matGrade,sciGrade,ssrGrade")
-	//var wg sync.WaitGroup
-	for countyIndex := range counties {
-		//wg.Add(1)
-		debug("Country index(main): " + countyIndex)
-		//start a routine per county
-		//go func(countyIndex string) {
-		//defer wg.Done()
 
-		//indexes for all candidates in the county
+	for countyIndex := range counties {
+
+		debug("Country index(main): " + countyIndex)
+
 		students := getStudentDetails(countyIndex, client)
 		//print out students
 		for student := range students {
@@ -271,8 +277,5 @@ func main() {
 			}
 			fmt.Println(out)
 		}
-		//}(countyIndex)
 	}
-	//wg.Wait()
-
 }
