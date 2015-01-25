@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -16,8 +17,7 @@ import (
 const (
 	POSTDATA     = "&ctl00%24cphMain%24TabContainer1%24Marks%24ddlYear=2014&ctl00%24cphMain%24TabContainer1%24Marks%24btnFind=Find"
 	KNEC_URL     = "http://www.knec-portal.ac.ke/RESULTS/ResultKCPE.aspx"
-	MAXROUTINES  = 1000
-	STUDENTERROR = 2
+	STUDENTERROR = 5
 )
 
 /*given an index number return a candidates results in a html page */
@@ -98,40 +98,64 @@ func getCountyNumbers() chan string {
 
 }
 
-func getIndexNumbers(countyIndex string, errorChan chan bool) chan string {
+func getStudentDetails(countyIndex string, client *http.Client) (students chan map[string]string) {
 
-	ch := make(chan string)
+	ch := make(chan map[string]string)
 
 	go func() {
 
 		// loop through all possible schools
+		var wg sync.WaitGroup
+		for i := 117; i < 130; i++ {
+			wg.Add(1)
+			go func(i int) {
+				defer wg.Done()
+				var errCount uint64 = 0
+				fmt.Println("New School")
+				var schoolIndex string = "000" + strconv.Itoa(i)
+				schoolIndex = schoolIndex[(len(schoolIndex) - 3):]
+				candidates := genCandidateIndex()
 
-		for i := 117; i < 1000; i++ {
+				for j := 0; j < len(candidates); j++ {
 
-			var errCount uint64 = 0
-			fmt.Println("New School")
-			var schoolIndex string = "000" + strconv.Itoa(i)
-			schoolIndex = schoolIndex[(len(schoolIndex) - 3):]
-			move := make(chan bool, 1)
-			studentInd := genCandidateIndex(move)
-			move <- false
-			// for each school, loop through every possible student
-			for candidateIndex := range studentInd {
-				fmt.Println("waiting")
-				if e := <-errorChan; e == true {
-					fmt.Println("error")
-					errCount += 1
-					if errCount > STUDENTERROR {
-						move <- true
+					for n := 0; n < len(candidates[j]); n++ {
+
+						candidateIndex := "000" + strconv.Itoa(candidates[j][n])
+						candidateIndex = candidateIndex[(len(candidateIndex) - 3):]
+						fmt.Println("waiting")
+						stud := countyIndex + schoolIndex + string(candidateIndex)
+						fmt.Println(stud)
+						res, err := getCandidateResults(stud, client)
+						if err != nil {
+							log.Fatal("Error with the connection")
+
+						}
+						//fmt.Println("here 1")
+						p := &PageResult{Page: res, Index: stud}
+
+						student, err := parsePage(p)
+						//fmt.Println("here 2")
+						fmt.Println(parsePage(p))
+
+						if err != nil {
+							fmt.Println("error")
+							errCount += 1
+							if errCount%STUDENTERROR == 0 {
+								break
+								fmt.Println("Ma bad")
+
+							}
+
+						} else {
+							ch <- student
+
+						}
+
 					}
-
 				}
-				fmt.Println("candidateIndex: " + candidateIndex)
-				ch <- (countyIndex + schoolIndex + candidateIndex)
-				move <- false
-			}
+			}(i)
 		}
-
+		wg.Wait()
 		close(ch)
 
 	}()
@@ -139,9 +163,9 @@ func getIndexNumbers(countyIndex string, errorChan chan bool) chan string {
 	return ch
 }
 
-func genCandidateIndex(move chan bool) chan string {
+func genCandidateIndex() map[int][]int {
 
-	res := make(chan string)
+	//res := make(chan string)
 	candidates := make(map[int][]int)
 
 	candidates[0] = append(candidates[0], 1)
@@ -165,18 +189,21 @@ func genCandidateIndex(move chan bool) chan string {
 	for i := 800; i < 900; i++ {
 		candidates[3] = append(candidates[1], i+1)
 	}*/
-	go func() {
+	/*go func() {
 	Cands:
 		for _, val := range candidates {
 
 			for _, index := range val {
-
-				yes := <-move
+				fmt.Println("moving waiting")
+				yes, ok := <-move
+				if !ok {
+					break Cands
+				}
 				fmt.Println("moving", yes)
 				if yes {
 					continue Cands
 				}
-				var candidateIndex string = "000" + strconv.Itoa(index)
+				candidateIndex := "000" + strconv.Itoa(index)
 				candidateIndex = candidateIndex[(len(candidateIndex) - 3):]
 				res <- candidateIndex
 			}
@@ -184,11 +211,11 @@ func genCandidateIndex(move chan bool) chan string {
 		}
 		/*
 			res <- "001"
-			res <- "002"*/
+			res <- "002"
 		close(res)
-	}()
+	}()*/
 
-	return res
+	return candidates
 
 }
 
@@ -256,58 +283,33 @@ func main() {
 		"matGrade", "sciGrade", "ssrGrade"}
 
 	fmt.Println("total,name,eng,kis,mat,sci,ssr,schoolName,gender,engGrade,kisGrade,matGrade,sciGrade,ssrGrade")
-
 	var wg sync.WaitGroup
 	for countyIndex := range counties {
 		wg.Add(1)
 		fmt.Println("Country index(main): " + countyIndex)
 		//start a routine per county
-		go func() {
+		go func(countyIndex string) {
 			defer wg.Done()
 
-			errorChan := make(chan bool, 1)
-			errorChan <- false
-			defer close(errorChan)
 			//indexes for all candidates in the county
-			indexes := getIndexNumbers(countyIndex, errorChan)
-			for index := range indexes {
-				fmt.Println("index(main): " + index)
-				res, err := getCandidateResults(index, client)
-				if err != nil {
+			students := getStudentDetails(countyIndex, client)
+			//print out students
+			for student := range students {
+				out := ""
+				for i, details := range fields {
 
-					fmt.Println("Error with the connection")
+					if i < len(fields)-1 {
+						out += student[details] + ","
+					} else {
 
-				}
-				//fmt.Println("here 1")
-				p := &PageResult{Page: res, Index: index}
-
-				student, err := parsePage(p)
-				//fmt.Println("here 2")
-				fmt.Println(parsePage(p))
-				if err != nil {
-					errorChan <- true
-					fmt.Println("here 3")
-
-				} else {
-					errorChan <- false
-					fmt.Println("here 4")
-					out := ""
-					for i, details := range fields {
-
-						if i < len(fields)-1 {
-							out += student[details] + ","
-						} else {
-
-							out += student[details]
-						}
+						out += student[details]
 					}
-
-					fmt.Println(out)
-
 				}
+
+				fmt.Println(out)
 			}
 
-		}()
+		}(countyIndex)
 
 	}
 
