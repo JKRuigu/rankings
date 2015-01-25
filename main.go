@@ -18,7 +18,9 @@ const (
 	POSTDATA     = "&ctl00%24cphMain%24TabContainer1%24Marks%24ddlYear=2014&ctl00%24cphMain%24TabContainer1%24Marks%24btnFind=Find"
 	KNEC_URL     = "http://www.knec-portal.ac.ke/RESULTS/ResultKCPE.aspx"
 	STUDENTERROR = 5
-	DEBUG        = true
+	DEBUG        = false
+	//schools per county
+	MAXSCHOOLS = 1000
 )
 
 /*given an index number return a candidates results in a html page */
@@ -29,7 +31,7 @@ type PageResult struct {
 
 func debug(stuff string) {
 	if DEBUG {
-		fmt.Println(string)
+		fmt.Println(stuff)
 	}
 }
 
@@ -42,13 +44,16 @@ func getCandidateResults(index string, client *http.Client) (htmlPage string, er
 		return "", errors.New("Couldn't make post request")
 	}
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Add("User-agent", "Mozilla/5.0")
 	resp, err := client.Do(req)
 
 	if err != nil {
+		log.Fatal(err)
 		return "", errors.New("Making request error")
 	}
 
 	restr, err := ioutil.ReadAll(resp.Body)
+	resp.Body.Close()
 
 	if err != nil {
 		return "", errors.New("Body parse error")
@@ -59,9 +64,7 @@ func getCandidateResults(index string, client *http.Client) (htmlPage string, er
 func getCountyNumbers() chan string {
 
 	ch := make(chan string) // for generator
-
-	COUNTY_NUMBERS := []string{"01113"}
-	/*COUNTY_NUMBERS := []string{"01101"} , "01113", "01114", "01115", "02105", "02109", "02110", "03106", "03108",
+	COUNTY_NUMBERS := []string{"01101"} , "01113", "01114", "01115", "02105", "02109", "02110", "03106", "03108",
 	"03120", "03121", "04102", "04107", "04111", "04116", "04119", "04122", "05103",
 	"05112", "05117", "06104", "06118", "07201", "07209", "07213", "07214", "07215",
 	"07216", "07225", "08202", "08210", "08217", "08218", "08219", "08220", "08221",
@@ -92,7 +95,7 @@ func getCountyNumbers() chan string {
 	"42725", "42738", "43705", "43715", "43720", "43722", "43728", "44707", "44708",
 	"44717", "44718", "44729", "44736", "44739", "45301", "45304", "45305", "45806",
 	"45815", "45816", "45821", "46802", "46807", "46308", "46809", "46813", "46818",
-	"46819", "46320", "47803", "47810", "47311", "47812", "47814", "47817"}*/
+	"46819", "46320", "47803", "47810", "47311", "47812", "47814", "47817"}
 
 	go func() {
 		for _, v := range COUNTY_NUMBERS {
@@ -113,12 +116,12 @@ func getStudentDetails(countyIndex string, client *http.Client) (students chan m
 
 		// loop through all possible schools
 		var wg sync.WaitGroup
-		for i := 117; i < 130; i++ {
+		for i := 117; i < MAXSCHOOLS; i++ {
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()
 				var errCount uint64 = 0
-				fmt.Println("New School")
+				debug("New School")
 				var schoolIndex string = "000" + strconv.Itoa(i)
 				schoolIndex = schoolIndex[(len(schoolIndex) - 3):]
 				candidates := genCandidateIndex()
@@ -129,27 +132,23 @@ func getStudentDetails(countyIndex string, client *http.Client) (students chan m
 
 						candidateIndex := "000" + strconv.Itoa(candidates[j][n])
 						candidateIndex = candidateIndex[(len(candidateIndex) - 3):]
-						fmt.Println("waiting")
+						debug("waiting")
 						stud := countyIndex + schoolIndex + string(candidateIndex)
-						fmt.Println(stud)
+						debug(stud)
 						res, err := getCandidateResults(stud, client)
 						if err != nil {
-							log.Fatal("Error with the connection")
+							log.Fatal(err)
 
 						}
-						//fmt.Println("here 1")
+
 						p := &PageResult{Page: res, Index: stud}
-
 						student, err := parsePage(p)
-						//fmt.Println("here 2")
-						fmt.Println(parsePage(p))
-
 						if err != nil {
-							fmt.Println("error")
+							debug("error")
 							errCount += 1
 							if errCount%STUDENTERROR == 0 {
 								break
-								fmt.Println("Ma bad")
+								debug("Ma bad")
 
 							}
 
@@ -172,19 +171,8 @@ func getStudentDetails(countyIndex string, client *http.Client) (students chan m
 
 func genCandidateIndex() map[int][]int {
 
-	//res := make(chan string)
-	candidates := make(map[int][]int)
-
-	candidates[0] = append(candidates[0], 1)
-	candidates[0] = append(candidates[0], 2)
-	candidates[0] = append(candidates[0], 3)
-	candidates[1] = append(candidates[1], 11)
-	candidates[1] = append(candidates[1], 12)
-	candidates[1] = append(candidates[1], 13)
-	candidates[2] = append(candidates[2], 100)
-	candidates[2] = append(candidates[2], 101)
-	candidates[2] = append(candidates[2], 102)
-	/*for i := 0; i < 300; i++ {
+	
+	for i := 0; i < 300; i++ {
 		candidates[0] = append(candidates[0], i+1)
 	}
 	for i := 300; i < 600; i++ {
@@ -195,33 +183,7 @@ func genCandidateIndex() map[int][]int {
 	}
 	for i := 800; i < 900; i++ {
 		candidates[3] = append(candidates[1], i+1)
-	}*/
-	/*go func() {
-	Cands:
-		for _, val := range candidates {
-
-			for _, index := range val {
-				fmt.Println("moving waiting")
-				yes, ok := <-move
-				if !ok {
-					break Cands
-				}
-				fmt.Println("moving", yes)
-				if yes {
-					continue Cands
-				}
-				candidateIndex := "000" + strconv.Itoa(index)
-				candidateIndex = candidateIndex[(len(candidateIndex) - 3):]
-				res <- candidateIndex
-			}
-
-		}
-		/*
-			res <- "001"
-			res <- "002"
-		close(res)
-	}()*/
-
+	}
 	return candidates
 
 }
@@ -312,14 +274,10 @@ func main() {
 						out += student[details]
 					}
 				}
-
 				fmt.Println(out)
 			}
-
 		}(countyIndex)
-
 	}
-
 	wg.Wait()
 
 }
