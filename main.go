@@ -18,7 +18,7 @@ const (
 	POSTDATA     = "&ctl00%24cphMain%24TabContainer1%24Marks%24ddlYear=2014&ctl00%24cphMain%24TabContainer1%24Marks%24btnFind=Find"
 	KNEC_URL     = "http://www.knec-portal.ac.ke/RESULTS/ResultKCPE.aspx"
 	STUDENTERROR = 5
-	DEBUG        = false
+	DEBUG        = true
 	//schools per county
 	MAXSCHOOLS = 1000
 )
@@ -116,7 +116,7 @@ func getStudentDetails(countyIndex string, client *http.Client) (students chan m
 
 		// loop through all possible schools
 		var wg sync.WaitGroup
-		for i := 117; i < MAXSCHOOLS; i++ {
+		for i := 0; i < MAXSCHOOLS; i++ {
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()
@@ -138,7 +138,6 @@ func getStudentDetails(countyIndex string, client *http.Client) (students chan m
 						res, err := getCandidateResults(stud, client)
 						if err != nil {
 							log.Fatal(err)
-
 						}
 
 						p := &PageResult{Page: res, Index: stud}
@@ -149,23 +148,19 @@ func getStudentDetails(countyIndex string, client *http.Client) (students chan m
 							if errCount%STUDENTERROR == 0 {
 								break
 								debug("Ma bad")
-
 							}
 
 						} else {
 							ch <- student
 
 						}
-
 					}
 				}
 			}(i)
 		}
 		wg.Wait()
 		close(ch)
-
 	}()
-
 	return ch
 }
 
@@ -186,7 +181,6 @@ func genCandidateIndex() map[int][]int {
 		candidates[3] = append(candidates[1], i+1)
 	}
 	return candidates
-
 }
 
 /* Parse html page and give  results in a CSV format */
@@ -253,32 +247,32 @@ func main() {
 		"matGrade", "sciGrade", "ssrGrade"}
 
 	fmt.Println("total,name,eng,kis,mat,sci,ssr,schoolName,gender,engGrade,kisGrade,matGrade,sciGrade,ssrGrade")
-	var wg sync.WaitGroup
+	//var wg sync.WaitGroup
 	for countyIndex := range counties {
-		wg.Add(1)
+		//wg.Add(1)
 		debug("Country index(main): " + countyIndex)
 		//start a routine per county
-		go func(countyIndex string) {
-			defer wg.Done()
+		//go func(countyIndex string) {
+		//defer wg.Done()
 
-			//indexes for all candidates in the county
-			students := getStudentDetails(countyIndex, client)
-			//print out students
-			for student := range students {
-				out := ""
-				for i, details := range fields {
+		//indexes for all candidates in the county
+		students := getStudentDetails(countyIndex, client)
+		//print out students
+		for student := range students {
+			out := ""
+			for i, details := range fields {
 
-					if i < len(fields)-1 {
-						out += student[details] + ","
-					} else {
+				if i < len(fields)-1 {
+					out += student[details] + ","
+				} else {
 
-						out += student[details]
-					}
+					out += student[details]
 				}
-				fmt.Println(out)
 			}
-		}(countyIndex)
+			fmt.Println(out)
+		}
+		//}(countyIndex)
 	}
-	wg.Wait()
+	//wg.Wait()
 
 }
