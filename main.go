@@ -18,12 +18,19 @@ const (
 	POSTDATA     = "&ctl00%24cphMain%24TabContainer1%24Marks%24ddlYear=2014&ctl00%24cphMain%24TabContainer1%24Marks%24btnFind=Find"
 	KNEC_URL     = "http://www.knec-portal.ac.ke/RESULTS/ResultKCPE.aspx"
 	STUDENTERROR = 5
+	DEBUG        = true
 )
 
 /*given an index number return a candidates results in a html page */
 type PageResult struct {
 	Page  string
 	Index string
+}
+
+func debug(stuff string) {
+	if DEBUG {
+		fmt.Println(string)
+	}
 }
 
 func getCandidateResults(index string, client *http.Client) (htmlPage string, err error) {
@@ -286,7 +293,7 @@ func main() {
 	var wg sync.WaitGroup
 	for countyIndex := range counties {
 		wg.Add(1)
-		fmt.Println("Country index(main): " + countyIndex)
+		debug("Country index(main): " + countyIndex)
 		//start a routine per county
 		go func(countyIndex string) {
 			defer wg.Done()
@@ -314,24 +321,5 @@ func main() {
 	}
 
 	wg.Wait()
-
-	/*counties := getCountyNumbers()
-	for countyIndex := range counties {
-		fmt.Println("Country index(main): " + countyIndex)
-		errorChan := make(chan bool)
-		indexes := getIndexNumbers(countyIndex, errorChan)
-
-		for index := range indexes {
-			fmt.Println("index(main): " + index)
-		}
-
-	}*/
-
-	/*FOR TESTING
-	client := &http.Client{}
-	index := "01113118001"
-	res, _ := getCandidateResults(index, client)
-	p := &PageResult{Page: res, Index: index}
-	fmt.Println(parsePage(p))*/
 
 }
