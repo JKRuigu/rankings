@@ -47,7 +47,6 @@ type BackoffPolicy struct {
 	Millis []int
 }
 
-// Default is a backoff policy ranging up to 5 seconds.
 var DefaultBackoff = makeBackoffPolicy(MAXATTEMPT)
 
 func makeBackoffPolicy(length int) BackoffPolicy {
@@ -55,8 +54,9 @@ func makeBackoffPolicy(length int) BackoffPolicy {
 	rand.Seed(5)
 	b := make([]int, length)
 	b[0] = 0
+	r := rand.Intn(length)
 	for i := 1; i < length; i++ {
-		b[i] = i + rand.Intn(length)
+		b[i] = (i + r) * 10
 	}
 
 	return BackoffPolicy{Millis: b}
