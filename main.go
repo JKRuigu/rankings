@@ -8,6 +8,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -19,11 +20,12 @@ import (
 const (
 	POSTDATA     = "&ctl00%24cphMain%24TabContainer1%24Marks%24ddlYear=2014&ctl00%24cphMain%24TabContainer1%24Marks%24btnFind=Find"
 	KNEC_URL     = "http://www.knec-portal.ac.ke/RESULTS/ResultKCPE.aspx"
-	STUDENTERROR = 5
+	STUDENTERROR = 2
 	DEBUG        = false
 	//schools per county
-	MAXSCHOOLS     = 1000
-	MAXCONNECTIONS = 100
+	MAXSCHOOLS = 1000
+	//connections attempts per candidate
+	MAXATTEMPT = 25
 )
 
 /*given an index number return a candidates results in a html page */
@@ -38,6 +40,49 @@ func debug(stuff string) {
 	}
 }
 
+// BackoffPolicy implements a backoff policy, randomizing its delays
+// and saturating at the final value in Millis.
+type BackoffPolicy struct {
+	Millis []int
+}
+
+// Default is a backoff policy ranging up to 5 seconds.
+var DefaultBackoff = makeBackoffPolicy(MAXATTEMPT)
+
+func makeBackoffPolicy(length int) BackoffPolicy {
+
+	rand.Seed(5)
+	b := make([]int, length)
+	b[0] = 0
+	for i := 1; i < length; i++ {
+		b[i] = i + rand.Intn(length)
+	}
+
+	return BackoffPolicy{Millis: b}
+
+}
+
+// Duration returns the time duration of the n'th wait cycle in a
+// backoff policy. This is b.Millis[n], randomized to avoid thundering
+// herds.
+func (b BackoffPolicy) Duration(n int) time.Duration {
+	if n >= len(b.Millis) {
+		n = len(b.Millis) - 1
+	}
+
+	return time.Duration(jitter(b.Millis[n])) * time.Millisecond
+}
+
+// jitter returns a random integer uniformly distributed in the range
+// [0.5 * millis .. 1.5 * millis]
+func jitter(millis int) int {
+	if millis == 0 {
+		return 0
+	}
+
+	return millis/2 + rand.Intn(millis)
+}
+
 func getCandidateResults(index string, client *http.Client) (htmlPage string, err error) {
 
 	data := getPreData() + index + POSTDATA
@@ -48,20 +93,32 @@ func getCandidateResults(index string, client *http.Client) (htmlPage string, er
 	}
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Add("User-agent", "Mozilla/5.0")
-	resp, err := client.Do(req)
+	attempt := 0
+	debug("making request")
+	for {
+		time.Sleep(DefaultBackoff.Duration(attempt))
+		resp, err := client.Do(req)
 
-	if err != nil {
-		log.Fatal(err)
-		return "", errors.New("Making request error")
+		if err != nil {
+			if attempt < MAXATTEMPT*MAXATTEMPT {
+				attempt++
+				debug("failed" + string(attempt))
+				continue
+			}
+			log.Fatal(err)
+			return "", errors.New("Making request error")
+		}
+		restr, err := ioutil.ReadAll(resp.Body)
+		resp.Body.Close()
+
+		if err != nil {
+			return "", errors.New("Body parse error")
+		}
+		return string(restr), nil
 	}
+	//should never get here
+	return "", nil
 
-	restr, err := ioutil.ReadAll(resp.Body)
-	resp.Body.Close()
-
-	if err != nil {
-		return "", errors.New("Body parse error")
-	}
-	return string(restr), nil
 }
 
 func getCountyNumbers() chan string {
@@ -122,27 +179,18 @@ func getStudentDetails(countyIndex string, client2 *http.Client) (students chan 
 		var wg sync.WaitGroup
 		for i := 0; i < MAXSCHOOLS; i++ {
 			wg.Add(1)
-			//artifical delay for connections
-			time.Sleep(time.Duration(rand.Int31n(3)) * time.Second)
 			go func(i int) {
 				defer wg.Done()
-				var errCount uint64 = 0
-				var conns uint64 = 0
 				debug("New School")
 				var schoolIndex string = "000" + strconv.Itoa(i)
 				schoolIndex = schoolIndex[(len(schoolIndex) - 3):]
 				candidates := genCandidateIndex()
-
 				for j := 0; j < len(candidates); j++ {
-
+					var errCount uint64 = 0
 					for n := 0; n < len(candidates[j]); n++ {
-						conns += 1
-						if conns%MAXCONNECTIONS == 0 {
-							time.Sleep(time.Duration(rand.Int31n(10)) * time.Second)
-						}
 						candidateIndex := "000" + strconv.Itoa(candidates[j][n])
 						candidateIndex = candidateIndex[(len(candidateIndex) - 3):]
-						debug("waiting")
+
 						stud := countyIndex + schoolIndex + string(candidateIndex)
 						debug(stud)
 						res, err := getCandidateResults(stud, client)
@@ -154,18 +202,20 @@ func getStudentDetails(countyIndex string, client2 *http.Client) (students chan 
 						student, err := parsePage(p)
 						if err != nil {
 							debug("error")
-							errCount += 1
-							if errCount%STUDENTERROR == 0 {
+							if errCount > STUDENTERROR {
 								break
 								debug("Ma bad")
 							}
+							errCount += 1
 
 						} else {
 							ch <- student
+							errCount = 0
 
 						}
 					}
 				}
+				debug("done with a school!")
 			}(i)
 		}
 		wg.Wait()
@@ -249,14 +299,18 @@ func parsePage(pageRes *PageResult) (stud map[string]string, err error) {
 
 func main() {
 
+	//use everything
+
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
 	client := &http.Client{}
 	counties := getCountyNumbers()
-	fields := []string{"total", "name", "eng",
+	fields := []string{"index", "total", "name", "eng",
 		"kis", "mat", "sci", "ssr",
 		"schoolName", "gender", "engGrade", "kisGrade",
 		"matGrade", "sciGrade", "ssrGrade"}
 
-	fmt.Println("total,name,eng,kis,mat,sci,ssr,schoolName,gender,engGrade,kisGrade,matGrade,sciGrade,ssrGrade")
+	fmt.Println("index,total,name,eng,kis,mat,sci,ssr,schoolName,gender,engGrade,kisGrade,matGrade,sciGrade,ssrGrade")
 
 	for countyIndex := range counties {
 
