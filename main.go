@@ -18,10 +18,11 @@ import (
 )
 
 const (
-	POSTDATA     = "&ctl00%24cphMain%24TabContainer1%24Marks%24ddlYear=2014&ctl00%24cphMain%24TabContainer1%24Marks%24btnFind=Find"
-	KNEC_URL     = "http://www.knec-portal.ac.ke/RESULTS/ResultKCPE.aspx"
-	STUDENTERROR = 2
-	DEBUG        = false
+	POSTDATA          = "&ctl00%24cphMain%24TabContainer1%24Marks%24ddlYear=2014&ctl00%24cphMain%24TabContainer1%24Marks%24btnFind=Find"
+	KNEC_URL          = "http://www.knec-portal.ac.ke/RESULTS/ResultKCPE.aspx"
+	RESOLVED_KNEC_URL = "http://41.220.229.200/RESULTS/ResultKCPE.aspx"
+	STUDENTERROR      = 2
+	DEBUG             = false
 	//schools per county
 	MAXSCHOOLS = 1000
 	//connections attempts per candidate
@@ -87,7 +88,7 @@ func getCandidateResults(index string, client *http.Client) (htmlPage string, er
 
 	data := getPreData() + index + POSTDATA
 	bb := bytes.NewBuffer([]byte(data))
-	req, err := http.NewRequest("POST", KNEC_URL, bb)
+	req, err := http.NewRequest("POST", RESOLVED_KNEC_URL, bb)
 	if err != nil {
 		return "", errors.New("Couldn't make post request")
 	}
