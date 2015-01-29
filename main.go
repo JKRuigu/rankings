@@ -191,6 +191,7 @@ func getStudentDetails(schoolIndex string, client *http.Client) []map[string]str
 			debug("got results")
 			p := &PageResult{Page: res, Index: stud}
 			student, err := parsePage(p)
+			debug(fmt.Sprintf("parsed student: %v", student))
 			if err != nil {
 				debug("error")
 				if errCount > STUDENTERROR {
@@ -201,6 +202,7 @@ func getStudentDetails(schoolIndex string, client *http.Client) []map[string]str
 
 			} else {
 				lst = append(lst, student)
+				debug("appended a student")
 				errCount = 0
 
 			}
@@ -214,13 +216,12 @@ func getStudentDetails(schoolIndex string, client *http.Client) []map[string]str
 func worker(schools <-chan string, client *http.Client, students chan<- map[string]string) {
 
 	var wg sync.WaitGroup
-
-	for i := 0; i < 20; i++ {
+	debug("working")
+	for i := 0; i < 50; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			for schoolIndex := range schools {
-
 				studs := getStudentDetails(schoolIndex, client)
 				debug(fmt.Sprintf("student: %v", studs))
 				for _, stud := range studs {
@@ -322,10 +323,10 @@ func getCountySchools() []string {
 			continue
 		}
 
-		_, ok := chk[string(index[0:9])]
+		_, ok := chk[string(index[0:8])]
 
 		if !ok {
-			countySchools = append(countySchools, string(index[0:9]))
+			countySchools = append(countySchools, string(index[0:8]))
 		}
 	}
 	return countySchools
@@ -353,8 +354,13 @@ func main() {
 		close(csch)
 	}()
 	students := make(chan map[string]string)
-	go worker(csch, client, students)
+	go func() {
+		worker(csch, client, students)
+
+		close(students)
+	}()
 	//print out students
+
 	for student := range students {
 		out := ""
 		for i, details := range fields {
