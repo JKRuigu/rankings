@@ -22,7 +22,7 @@ const (
 	KNEC_URL          = "http://www.knec-portal.ac.ke/RESULTS/ResultKCPE.aspx"
 	RESOLVED_KNEC_URL = "http://41.220.229.200/RESULTS/ResultKCPE.aspx"
 	STUDENTERROR      = 2
-	DEBUG             = true
+	DEBUG             = false
 	//schools per county
 	MAXSCHOOLS = 1000
 	//connections attempts per candidate
